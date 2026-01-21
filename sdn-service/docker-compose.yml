@@ -1,0 +1,61 @@
+services:
+  # ============================
+  # SDN CONTROLLER (Ryu)
+  # ============================
+  sdn-controller:
+    build: .
+    container_name: sdn-controller
+    command: >
+      ryu-manager
+      --observe-links
+      controllers.primary_controller
+      controllers.security_controller
+    volumes:
+      - ./controllers:/app/controllers
+    environment:
+      - PYTHONPATH=/app
+    ports:
+      - "6633:6633"        # OpenFlow
+    networks:
+      - sdn-net
+    depends_on:
+      - ai-service
+      - redis-db
+    restart: unless-stopped
+    platform: linux/amd64
+
+  # ============================
+  # AI SERVICE (WITH SIEM LOGGING)
+  # ============================
+  ai-service:
+    build: ./ai-service
+    image: ai-service:local
+    container_name: ai-service
+    ports:
+      - "5050:5000"        # AI REST API
+    volumes:
+      - ./logs:/var/log    # 🔥 SIEM EVENT LOG MOUNT
+    networks:
+      - sdn-net
+    restart: unless-stopped
+    platform: linux/amd64
+
+  # ============================
+  # REDIS (Blacklist / State)
+  # ============================
+  redis-db:
+    image: redis:alpine
+    container_name: redis-db
+    ports:
+      - "6379:6379"
+    networks:
+      - sdn-net
+    restart: unless-stopped
+
+# ============================
+# NETWORK
+# ============================
+networks:
+  sdn-net:
+    driver: bridge
+
